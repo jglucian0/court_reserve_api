@@ -1,0 +1,36 @@
+{
+  "name": "court_reserve_api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm run services:up && npm run services:wait:database && npm run migrations:up && nodemon api/v1/server.js",
+    "test": "npm run services:up && npm run services:wait:database && NODE_OPTIONS=--experimental-vm-modules jest --runInBand --verbose",
+    "test:watch": "npm run services:up && npm run services:wait:database && NODE_OPTIONS=--experimental-vm-modules jest --watchAll --runInBand --verbose",
+    "services:up": "docker compose -f infra/compose.yaml up -d",
+    "services:stop": "docker compose -f infra/compose.yaml stop",
+    "services:down": "docker compose -f infra/compose.yaml down",
+    "services:wait:database": "node infra/scripts/wait-for-postgres.js",
+    "migrations:create": "node-pg-migrate --migrations-dir infra/migrations create",
+    "migrations:up": "node-pg-migrate --migrations-dir infra/migrations --envPath .env.development up"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "node-pg-migrate": "7.6.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pg": "^8.22.0",
+    "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.4",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.9.3",
+    "supertest": "^7.2.2"
+  }
+}
