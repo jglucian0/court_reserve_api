@@ -16,11 +16,11 @@ const pool = new Pool({
   max: 20,
 });
 
-async function query(queryObject) {
+async function query(queryObject, values) {
   let client;
   try {
     client = await pool.connect();
-    const result = await client.query(queryObject);
+    const result = await client.query(queryObject, values);
     return result;
   } catch (error) {
     throw new ServiceError({
@@ -47,9 +47,14 @@ async function transaction(callback) {
   }
 }
 
+async function end() {
+  await pool.end();
+}
+
 const database = {
   query,
   transaction,
+  end,
 };
 
 export default database;
