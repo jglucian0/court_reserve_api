@@ -1,47 +1,51 @@
-import { Pool } from "pg";
-import { ServiceError } from "./errors.js";
+import pg from "pg";
+const { Pool } = pg;
 
-const sslConfig =
-  process.env.POSTGRES_HOST === "localhost"
-    ? false
-    : { rejectUnauthorized: false };
+let pool;
 
-const pool = new Pool({
-  host: process.env.POSTGRES_HOST,
-  port: process.env.POSTGRES_PORT,
-  user: process.env.POSTGRES_USER,
-  database: process.env.POSTGRES_DB,
-  password: process.env.POSTGRES_PASSWORD,
-  ssl: sslConfig,
-  max: 20,
-});
+function getPool() {
+  if (!pool) {
+    pool = new Pool({
+      host: process.env.POSTGRES_HOST,
+      port: process.env.POSTGRES_PORT,
+      user: process.env.POSTGRES_USER,
+      database: process.env.POSTGRES_DB,
+      password: process.env.POSTGRES_PASSWORD,
+      ssl: false,
+      max: 20,
+    });
+  }
+  return pool;
+}
 
 async function query(queryObject, values) {
-  let client;
+  const client = await getPool().connect();
   try {
-    client = await pool.connect();
-    const result = await client.query(queryObject, values);
-    return result;
-  } catch (error) {
-    throw new ServiceError({
-      message: "Erro na conexão com o Banco ou na Query.",
-      cause: error,
-    });
+    return await client.query(queryObject, values);
   } finally {
-    if (client) client.release();
+    client.release();
   }
 }
 
-async function transaction(callback) {
-  const client = await pool.connect();
+async function transaction(action) {
+  const client = await getPool().connect();
   try {
     await client.query("BEGIN");
-    const result = await callback(client);
+    const result = await action(client);
     await client.query("COMMIT");
     return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
+  } catch (originalError) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      const aggregated = new Error(
+        `ROLLBACK falhou após erro na transação. Erro original: [${originalError.message}]. Erro do ROLLBACK: [${rollbackError.message}]`,
+        { cause: originalError }
+      );
+      aggregated.name = "TransactionRollbackError";
+      throw aggregated;
+    }
+    throw originalError;
   } finally {
     client.release();
   }
@@ -51,10 +55,4 @@ async function end() {
   await pool.end();
 }
 
-const database = {
-  query,
-  transaction,
-  end,
-};
-
-export default database;
+export default { query, transaction, end };
