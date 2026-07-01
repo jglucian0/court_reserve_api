@@ -1,0 +1,28 @@
+@baseUrl = http://localhost:3000/api/v1
+
+### 1. Criar uma reserva
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+
+{
+  "court_id": "75b5ce9a-6115-45f9-ab91-da4696f8d374",
+  "customer_name": "João Teste",
+  "customer_cpf": "12345678901",
+  "reservation_date": "2026-07-30",
+  "start_time": "14:00:00",
+  "end_time": "15:00:00"
+}
+
+### 2. Consultar reservas do dia
+GET {{baseUrl}}/reservations?court_id=75b5ce9a-6115-45f9-ab91-da4696f8d374&date=2026-07-30
+
+### 3. Alterar status para pago
+PATCH {{baseUrl}}/reservations/bc2995a9-3362-484b-95bd-dc197de5ecee/status
+Content-Type: application/json
+
+{
+  "status": "paid"
+}
+
+### 4. Deletar reserva
+DELETE {{baseUrl}}/reservations/fce187a5-d0c1-40af-b7e7-d3c35813688d
