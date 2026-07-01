@@ -3,6 +3,7 @@ import app from "../../api/v1/app.js";
 import database from "../../infra/database.js";
 import orchestrator from "../../infra/orchestrator.js";
 
+
 describe("Endpoint POST /api/v1/reservations", () => {
   let activeCourtId;
 
@@ -23,6 +24,7 @@ describe("Endpoint POST /api/v1/reservations", () => {
     it("deve criar uma reserva com sucesso e retornar HTTP 201", async () => {
       const payload = {
         court_id: activeCourtId,
+        user_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         customer_name: "Cliente Web",
         customer_cpf: "11122233344",
         reservation_date: "2026-07-15",
@@ -39,9 +41,30 @@ describe("Endpoint POST /api/v1/reservations", () => {
       expect(response.body.payment_status).toBe("pending");
     });
 
-    it("deve retornar HTTP 400 se o caso de uso rejeitar por conflito de horário", async () => {
+    it("deve retornar HTTP 400 se o horário de término for menor ou igual ao de início", async () => {
       const payload = {
         court_id: activeCourtId,
+        user_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+        customer_name: "João Silva",
+        customer_cpf: "11122233344",
+        reservation_date: "2026-07-15",
+        start_time: "11:00:00",
+        end_time: "10:00:00",
+      };
+
+      const response = await request(app)
+        .post("/api/v1/reservations")
+        .send(payload);
+
+      // CORREÇÃO: Deve ser 400, não 201
+      expect(response.status).toBe(400);
+      expect(response.body.name).toBe("ValidationError");
+    });
+
+    it("deve retornar HTTP 409 se o caso de uso rejeitar por conflito de horário", async () => {
+      const payload = {
+        court_id: activeCourtId,
+        user_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         customer_name: "Cliente Web 2",
         customer_cpf: "55566677788",
         reservation_date: "2026-07-15",
@@ -50,17 +73,18 @@ describe("Endpoint POST /api/v1/reservations", () => {
       };
 
       await database.query(
-        `INSERT INTO reservations (court_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
-         VALUES ($1, 'Cliente Antigo', '00000000000', '2026-07-15', '10:00:00', '11:00:00');`,
-        [activeCourtId]
+        `INSERT INTO reservations (court_id, user_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
+         VALUES ($1, $2, 'Cliente Antigo', '00000000000', '2026-07-15', '10:00:00', '11:00:00');`,
+        [activeCourtId, "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"]
       );
 
       const response = await request(app)
         .post("/api/v1/reservations")
         .send(payload);
 
-      expect(response.status).toBe(400);
-      expect(response.body.name).toBe("ValidationError");
+      // CORREÇÃO: Deve ser 409 (Conflict), pois sua API está correta
+      expect(response.status).toBe(409);
+      expect(response.body.name).toBe("ScheduleConflictError");
       expect(response.body.message).toMatch(/indisponível|conflito/i);
     });
   });
@@ -83,6 +107,7 @@ describe("Endpoint POST /api/v1/reservations", () => {
     it("deve retornar HTTP 400 se o horário de término for menor ou igual ao de início", async () => {
       const payload = {
         court_id: activeCourtId,
+        user_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         customer_name: "João Silva",
         customer_cpf: "11122233344",
         reservation_date: "2026-07-15",
@@ -102,6 +127,7 @@ describe("Endpoint POST /api/v1/reservations", () => {
     it("deve retornar HTTP 400 se o court_id não for um UUID válido", async () => {
       const payload = {
         court_id: "id-invalido-123",
+        user_id: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         customer_name: "João Silva",
         customer_cpf: "11122233344",
         reservation_date: "2026-07-15",

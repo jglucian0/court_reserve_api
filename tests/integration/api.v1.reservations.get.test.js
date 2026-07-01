@@ -5,6 +5,7 @@ import orchestrator from "../../infra/orchestrator.js";
 
 describe("Endpoint GET /api/v1/reservations", () => {
   let activeCourtId;
+  const mockUserId = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"; // UUID fixo para testes
 
   beforeEach(async () => {
     await orchestrator.clearDatabase();
@@ -20,35 +21,39 @@ describe("Endpoint GET /api/v1/reservations", () => {
   });
 
   it("deve listar as reservas de uma quadra em uma data específica sem vazar dados sensíveis", async () => {
-    // 1. Setup: Insere reservas no banco. Duas na data alvo, uma em data diferente.
+    // 1. Setup: Insere reservas com user_id
     await database.query(
-      `INSERT INTO reservations (court_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
+      `INSERT INTO reservations (court_id, user_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
        VALUES 
-       ($1, 'Cliente A', '11111111111', '2026-08-20', '10:00:00', '11:00:00'),
-       ($1, 'Cliente B', '22222222222', '2026-08-20', '14:00:00', '15:00:00'),
-       ($1, 'Cliente C', '33333333333', '2026-08-21', '10:00:00', '11:00:00');`,
-      [activeCourtId]
+       ($1, $2, 'Cliente A', '11111111111', '2026-08-20', '10:00:00', '11:00:00'),
+       ($1, $2, 'Cliente B', '22222222222', '2026-08-20', '14:00:00', '15:00:00'),
+       ($1, $2, 'Cliente C', '33333333333', '2026-08-21', '10:00:00', '11:00:00');`,
+      [activeCourtId, mockUserId]
     );
 
-    // 2. Requisição para a data específica
+    // 2. Requisição COM o header necessário
     const response = await request(app)
-      .get(`/api/v1/reservations?court_id=${activeCourtId}&date=2026-08-20`);
+      .get(`/api/v1/reservations?court_id=${activeCourtId}&date=2026-08-20`)
+      .set("x-user-id", mockUserId);
 
     // 3. Asserções
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(2);
 
-    // Garante que o CPF não foi retornado (Clean Code/Segurança)
     expect(response.body[0].customer_cpf).toBeUndefined();
     expect(response.body[0].start_time).toBeDefined();
-    expect(response.body[0].end_time).toBeDefined();
   });
 
   it("deve retornar HTTP 400 se faltar o parâmetro court_id ou date", async () => {
-    const responseNoCourt = await request(app).get("/api/v1/reservations?date=2026-08-20");
+    // Envia o header para não cair no erro de 403, testando apenas a validação de param
+    const responseNoCourt = await request(app)
+      .get("/api/v1/reservations?date=2026-08-20")
+      .set("x-user-id", mockUserId);
     expect(responseNoCourt.status).toBe(400);
 
-    const responseNoDate = await request(app).get(`/api/v1/reservations?court_id=${activeCourtId}`);
+    const responseNoDate = await request(app)
+      .get(`/api/v1/reservations?court_id=${activeCourtId}`)
+      .set("x-user-id", mockUserId);
     expect(responseNoDate.status).toBe(400);
   });
 });

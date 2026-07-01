@@ -1,11 +1,15 @@
 import AvailabilityService from "../domain/services/AvailabilityService.js";
 import database from "../infra/database.js";
+import { ScheduleConflictError } from "../infra/errors.js";
+
+const PG_UNIQUE_VIOLATION = "23505";
 
 class BookCourtUseCase {
   static async execute(requestData) {
     return await database.transaction(async (client) => {
       const {
         court_id,
+        user_id,
         reservation_date,
         start_time,
         end_time,
@@ -35,25 +39,33 @@ class BookCourtUseCase {
       );
 
       if (!isAvailable) {
-        throw new Error("Horário indisponível - Conflito de agenda.");
+        throw new ScheduleConflictError();
       }
 
-      const insertQuery = await client.query(
-        `INSERT INTO reservations 
-         (court_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
-         VALUES ($1, $2, $3, $4, $5, $6) 
-         RETURNING id, payment_status;`,
-        [
-          court_id,
-          customer_name,
-          customer_cpf,
-          reservation_date,
-          start_time,
-          end_time,
-        ]
-      );
+      try {
+        const insertQuery = await client.query(
+          `INSERT INTO reservations 
+           (court_id, user_id, customer_name, customer_cpf, reservation_date, start_time, end_time) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7) 
+           RETURNING id, payment_status;`,
+          [
+            court_id,
+            user_id,
+            customer_name,
+            customer_cpf,
+            reservation_date,
+            start_time,
+            end_time,
+          ]
+        );
 
-      return insertQuery.rows[0];
+        return insertQuery.rows[0];
+      } catch (err) {
+        if (err.code === PG_UNIQUE_VIOLATION) {
+          throw new ScheduleConflictError({ cause: err });
+        }
+        throw err;
+      }
     });
   }
 }
