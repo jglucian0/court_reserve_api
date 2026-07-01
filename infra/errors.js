@@ -117,3 +117,86 @@ export class MethodNotAllowedError extends Error {
     };
   }
 }
+
+export class ForbiddenError extends Error {
+  constructor({ cause, message, action } = {}) {
+    super(message || "Você não tem permissão para acessar este recurso.", {
+      cause,
+    });
+    this.name = "ForbiddenError";
+    this.action = action || "Verifique se você é o proprietário deste recurso.";
+    this.statusCode = 403;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
+
+export class IdempotencyConflictError extends Error {
+  constructor({ cause, idempotencyKey } = {}) {
+    super(
+      `Esta requisição já foi processada anteriormente (chave: ${idempotencyKey ?? "desconhecida"}).`,
+      { cause }
+    );
+    this.name = "IdempotencyConflictError";
+    this.action = "Não reenvie esta requisição. O pagamento já foi registrado.";
+    this.statusCode = 409;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
+
+export class PaymentGatewayError extends Error {
+  constructor({ cause, gatewayMessage } = {}) {
+    super(
+      `Falha na comunicação com o gateway de pagamento: ${gatewayMessage ?? "erro desconhecido"}.`,
+      { cause }
+    );
+    this.name = "PaymentGatewayError";
+    this.action = "Tente novamente em instantes. O pagamento não foi cobrado.";
+    this.statusCode = 502;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
+
+export class ScheduleConflictError extends Error {
+  constructor({ cause } = {}) {
+    super("Conflito de agenda: este horário já está reservado para a quadra.", {
+      cause,
+    });
+    this.name = "ScheduleConflictError";
+    this.action =
+      "Escolha outro horário ou outra quadra e tente novamente.";
+    this.statusCode = 409;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
