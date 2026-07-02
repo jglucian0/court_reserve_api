@@ -52,7 +52,10 @@ async function transaction(action) {
 }
 
 async function end() {
-  await pool.end();
+  if (pool) {
+    await pool.end();
+    pool = undefined;
+  }
 }
 
 export default { query, transaction, end };
