@@ -1,7 +1,7 @@
 import database from "./database.js";
 
 async function clearDatabase() {
-  await database.query("TRUNCATE TABLE reservations, courts CASCADE;");
+  await database.query("TRUNCATE TABLE users, reservations, courts CASCADE;");
 }
 
 async function closeConnection() {

@@ -59,12 +59,30 @@ export class ValidationError extends Error {
 }
 
 export class UnauthorizedError extends Error {
-  constructor({ cause, message, action }) {
+  constructor({ cause, message, action } = {}) {
     super(message || "Usuário não autenticado.", {
       cause,
     });
     this.name = "UnauthorizedError";
     this.action = action || "Faça novamente o login para continuar.";
+    this.statusCode = 401;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
+
+export class InvalidTokenError extends Error {
+  constructor({ cause, message } = {}) {
+    super(message || "Token de autenticação inválido ou expirado.", { cause });
+    this.name = "InvalidTokenError";
+    this.action = "Faça login novamente para obter um novo token.";
     this.statusCode = 401;
   }
 
@@ -188,6 +206,26 @@ export class ScheduleConflictError extends Error {
     this.name = "ScheduleConflictError";
     this.action =
       "Escolha outro horário ou outra quadra e tente novamente.";
+    this.statusCode = 409;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      action: this.action,
+      status_code: this.statusCode,
+    };
+  }
+}
+
+export class ConflictError extends Error {
+  constructor({ cause, message, action } = {}) {
+    super(message || "O recurso já existe e não pode ser duplicado.", {
+      cause,
+    });
+    this.name = "ConflictError";
+    this.action = action || "Verifique os dados enviados e tente novamente.";
     this.statusCode = 409;
   }
 
