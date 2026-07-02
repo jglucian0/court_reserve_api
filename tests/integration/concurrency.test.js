@@ -2,11 +2,13 @@ import supertest from "supertest";
 import app from "../../api/v1/app.js";
 import database from "../../infra/database.js";
 import orchestrator from "../../infra/orchestrator.js";
+import jwt from "jsonwebtoken";
 
 const request = supertest(app);
 
-
 const USER_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const validToken = jwt.sign({ sub: USER_ID }, process.env.JWT_SECRET || "test-secret-key-global");
+const bearerToken = `Bearer ${validToken}`;
 
 const BASE_RESERVATION_BODY = {
   user_id: USER_ID,
@@ -16,7 +18,6 @@ const BASE_RESERVATION_BODY = {
   start_time: "10:00:00",
   end_time: "11:00:00",
 };
-
 
 async function createActiveCourt(name = "Quadra Concorrência") {
   const result = await database.query(
@@ -40,7 +41,6 @@ async function countPaymentLogs() {
   return Number(rows[0].total);
 }
 
-
 describe("Testes de concorrência e estresse", () => {
   beforeEach(async () => {
     await orchestrator.clearDatabase();
@@ -50,7 +50,6 @@ describe("Testes de concorrência e estresse", () => {
     await orchestrator.closeConnection();
   });
 
-
   describe("BookCourtUseCase — 10 requisições simultâneas para o mesmo slot", () => {
     it("deve criar exatamente 1 reserva e rejeitar 9 com status 409", async () => {
       const courtId = await createActiveCourt();
@@ -58,7 +57,9 @@ describe("Testes de concorrência e estresse", () => {
       const requestBody = { ...BASE_RESERVATION_BODY, court_id: courtId };
 
       const requests = Array.from({ length: 10 }, () =>
-        request.post("/api/v1/reservations").send(requestBody)
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send(requestBody)
       );
 
       const responses = await Promise.all(requests);
@@ -84,18 +85,22 @@ describe("Testes de concorrência e estresse", () => {
       const courtId = await createActiveCourt();
 
       const [res1, res2] = await Promise.all([
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtId,
-          start_time: "08:00:00",
-          end_time: "09:00:00",
-        }),
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtId,
-          start_time: "09:00:00",
-          end_time: "10:00:00",
-        }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtId,
+            start_time: "08:00:00",
+            end_time: "09:00:00",
+          }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtId,
+            start_time: "09:00:00",
+            end_time: "10:00:00",
+          }),
       ]);
 
       expect(res1.status).toBe(201);
@@ -110,14 +115,18 @@ describe("Testes de concorrência e estresse", () => {
       ]);
 
       const [resA, resB] = await Promise.all([
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtA,
-        }),
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtB,
-        }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtA,
+          }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtB,
+          }),
       ]);
 
       expect(resA.status).toBe(201);
@@ -126,13 +135,13 @@ describe("Testes de concorrência e estresse", () => {
     });
   });
 
-
   describe("ProcessPaymentUseCase — 10 requisições simultâneas com a mesma idempotency-key", () => {
     it("deve criar exatamente 1 log de pagamento e rejeitar 9 com status 409", async () => {
       const courtId = await createActiveCourt();
 
       const reservationRes = await request
         .post("/api/v1/reservations")
+        .set("Authorization", bearerToken)
         .send({ ...BASE_RESERVATION_BODY, court_id: courtId });
 
       expect(reservationRes.status).toBe(201);
@@ -143,6 +152,7 @@ describe("Testes de concorrência e estresse", () => {
       const paymentRequests = Array.from({ length: 10 }, () =>
         request
           .post(`/api/v1/reservations/${reservationId}/payment`)
+          .set("Authorization", bearerToken)
           .set("idempotency-key", IDEMPOTENCY_KEY)
       );
 
@@ -180,14 +190,18 @@ describe("Testes de concorrência e estresse", () => {
       ]);
 
       const [resA, resB] = await Promise.all([
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtA,
-        }),
-        request.post("/api/v1/reservations").send({
-          ...BASE_RESERVATION_BODY,
-          court_id: courtB,
-        }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtA,
+          }),
+        request.post("/api/v1/reservations")
+          .set("Authorization", bearerToken)
+          .send({
+            ...BASE_RESERVATION_BODY,
+            court_id: courtB,
+          }),
       ]);
 
       expect(resA.status).toBe(201);
@@ -196,9 +210,11 @@ describe("Testes de concorrência e estresse", () => {
       const [payA, payB] = await Promise.all([
         request
           .post(`/api/v1/reservations/${resA.body.id}/payment`)
+          .set("Authorization", bearerToken)
           .set("idempotency-key", "key-quadra-a-001"),
         request
           .post(`/api/v1/reservations/${resB.body.id}/payment`)
+          .set("Authorization", bearerToken)
           .set("idempotency-key", "key-quadra-b-001"),
       ]);
 
@@ -208,13 +224,13 @@ describe("Testes de concorrência e estresse", () => {
     });
   });
 
-
   describe("DeleteReservationUseCase — 10 tentativas simultâneas de deletar a mesma reserva", () => {
     it("deve deletar exatamente 1 vez e retornar 404 nas demais tentativas", async () => {
       const courtId = await createActiveCourt();
 
       const reservationRes = await request
         .post("/api/v1/reservations")
+        .set("Authorization", bearerToken)
         .send({ ...BASE_RESERVATION_BODY, court_id: courtId });
 
       expect(reservationRes.status).toBe(201);
@@ -223,7 +239,7 @@ describe("Testes de concorrência e estresse", () => {
       const deleteRequests = Array.from({ length: 10 }, () =>
         request
           .delete(`/api/v1/reservations/${reservationId}`)
-          .set("x-user-id", USER_ID)
+          .set("Authorization", bearerToken)
       );
 
       const responses = await Promise.all(deleteRequests);

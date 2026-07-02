@@ -2,6 +2,11 @@ import request from "supertest";
 import app from "../../api/v1/app.js";
 import database from "../../infra/database.js";
 import orchestrator from "../../infra/orchestrator.js";
+import jwt from "jsonwebtoken";
+
+const USER_ID = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+const validToken = jwt.sign({ sub: USER_ID }, process.env.JWT_SECRET || "test-secret-key-global");
+const bearerToken = `Bearer ${validToken}`;
 
 describe("Endpoint PATCH /api/v1/reservations/:id/status", () => {
   let activeCourtId;
@@ -16,9 +21,9 @@ describe("Endpoint PATCH /api/v1/reservations/:id/status", () => {
     activeCourtId = courtInsert.rows[0].id;
 
     const reservationInsert = await database.query(
-      `INSERT INTO reservations (court_id, customer_name, customer_cpf, reservation_date, start_time, end_time, payment_status) 
-       VALUES ($1, 'Cliente Teste', '11122233344', '2026-09-10', '18:00:00', '19:00:00', 'pending') RETURNING id;`,
-      [activeCourtId]
+      `INSERT INTO reservations (court_id, user_id, customer_name, customer_cpf, reservation_date, start_time, end_time, payment_status) 
+       VALUES ($1, $2, 'Cliente Teste', '11122233344', '2026-09-10', '18:00:00', '19:00:00', 'pending') RETURNING id;`,
+      [activeCourtId, USER_ID]
     );
     pendingReservationId = reservationInsert.rows[0].id;
   });
@@ -30,6 +35,7 @@ describe("Endpoint PATCH /api/v1/reservations/:id/status", () => {
   it("deve atualizar o status de pagamento para 'paid' e retornar HTTP 200", async () => {
     const response = await request(app)
       .patch(`/api/v1/reservations/${pendingReservationId}/status`)
+      .set("Authorization", bearerToken)
       .send({ status: "paid" });
 
     expect(response.status).toBe(200);
@@ -42,6 +48,7 @@ describe("Endpoint PATCH /api/v1/reservations/:id/status", () => {
   it("deve retornar HTTP 400 se o status enviado for inválido", async () => {
     const response = await request(app)
       .patch(`/api/v1/reservations/${pendingReservationId}/status`)
+      .set("Authorization", bearerToken)
       .send({ status: "finalizado" });
 
     expect(response.status).toBe(400);
@@ -53,6 +60,7 @@ describe("Endpoint PATCH /api/v1/reservations/:id/status", () => {
 
     const response = await request(app)
       .patch(`/api/v1/reservations/${randomUuid}/status`)
+      .set("Authorization", bearerToken)
       .send({ status: "cancelled" });
 
     expect(response.status).toBe(404);
