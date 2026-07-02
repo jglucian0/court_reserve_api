@@ -1,28 +1,54 @@
 @baseUrl = http://localhost:3000/api/v1
+@courtId = b0fc8740-a515-4502-b1d0-325b13e6a524
+@reservationId = 417f7958-f757-429a-9b27-3d4df20e4dcf
 
-### 1. Criar uma reserva
-POST {{baseUrl}}/reservations
+# Após executar o Passo 1, cole o token gerado abaixo:
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhYWFhYWFhYS1hYWFhLWFhYWEtYWFhYS1hYWFhYWFhYWFhYWEiLCJlbWFpbCI6ImpvYW9AYWNpbWFyLmNvbSIsImlhdCI6MTc4Mjk0NzQ1OCwiZXhwIjoxNzgzMDMzODU4fQ.3sX-qxiUub9IfvFkaDr59whfwsrjZmGaFc9T4Uu8cwc
+
+### 1. Autenticação (Login)
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "court_id": "75b5ce9a-6115-45f9-ab91-da4696f8d374",
+  "email": "joao@acimar.com",
+  "password": "senha123"
+}
+
+### 2. Criar uma reserva
+POST {{baseUrl}}/reservations
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "court_id": "{{courtId}}",
   "customer_name": "João Teste",
   "customer_cpf": "12345678901",
   "reservation_date": "2026-07-30",
-  "start_time": "14:00:00",
-  "end_time": "15:00:00"
+  "start_time": "11:00:00",
+  "end_time": "12:00:00"
 }
 
-### 2. Consultar reservas do dia
-GET {{baseUrl}}/reservations?court_id=75b5ce9a-6115-45f9-ab91-da4696f8d374&date=2026-07-30
+### 3. Consultar reservas do dia
+GET {{baseUrl}}/reservations?court_id={{courtId}}&date=2026-07-30
+Authorization: Bearer {{token}}
 
-### 3. Alterar status para pago
-PATCH {{baseUrl}}/reservations/bc2995a9-3362-484b-95bd-dc197de5ecee/status
+### 4. Alterar status para pago
+PATCH {{baseUrl}}/reservations/{{reservationId}}/status
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
   "status": "paid"
 }
 
-### 4. Deletar reserva
-DELETE {{baseUrl}}/reservations/fce187a5-d0c1-40af-b7e7-d3c35813688d
+### 5. Deletar reserva
+DELETE {{baseUrl}}/reservations/{{reservationId}}
+Authorization: Bearer {{token}}
+
+
+
+
+
+
+
+
